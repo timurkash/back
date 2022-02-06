@@ -3,8 +3,8 @@ package status
 import (
 	"errors"
 	"fmt"
-	"gitlab.com/mcsolutions/lib/back/common/json"
-	"gitlab.com/mcsolutions/lib/back/common/logger"
+	"github.com/timurkash/back/json"
+	"github.com/timurkash/back/logger"
 	"log"
 	"net/http"
 )

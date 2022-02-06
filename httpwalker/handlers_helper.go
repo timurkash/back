@@ -2,7 +2,7 @@ package httpwalker
 
 import (
 	"github.com/gorilla/mux"
-	"gitlab.com/mcsolutions/lib/back/common/others"
+	"github.com/timurkash/back/others"
 	"net/http"
 	"strings"
 )

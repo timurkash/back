@@ -1,11 +1,11 @@
 package hh
 
 import (
-	"gitlab.com/mcsolutions/lib/back/common/env"
-	"gitlab.com/mcsolutions/lib/back/common/header"
-	"gitlab.com/mcsolutions/lib/back/common/json"
-	"gitlab.com/mcsolutions/lib/back/common/logger"
-	"gitlab.com/mcsolutions/lib/back/common/status"
+	"github.com/timurkash/back/env"
+	"github.com/timurkash/back/header"
+	"github.com/timurkash/back/json"
+	"github.com/timurkash/back/logger"
+	"github.com/timurkash/back/status"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"os"

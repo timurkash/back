@@ -3,7 +3,7 @@ package paging
 import (
 	"errors"
 	"github.com/jinzhu/gorm"
-	"gitlab.com/mcsolutions/lib/back/common/json"
+	"github.com/timurkash/back/json"
 )
 
 type (

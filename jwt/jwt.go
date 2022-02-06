@@ -7,12 +7,11 @@ import (
 	"errors"
 	"fmt"
 	jwtgo "github.com/dgrijalva/jwt-go"
-	"gitlab.com/mcsolutions/lib/back/common/header"
+	"github.com/timurkash/back/header"
 	"io/ioutil"
 	"math/big"
 	"net/http"
 	"strings"
-	"time"
 )
 
 const Authorization = "Authorization"
@@ -24,37 +23,16 @@ type (
 		Audience string
 		JwksUrl  string
 	}
-
+	Key struct {
+		Alg string `json:"alg"`
+		E   string `json:"e"`
+		Kid string `json:"kid"`
+		N   string `json:"n"`
+		Kty string `json:"kty"`
+		Use string `json:"use"`
+	}
 	Keys struct {
-		Keys []map[string]string `json:"keys"`
-	}
-
-	Payload struct {
-		Iss           string `json:"iss"`
-		Aud           string `json:"aud"`
-		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"`
-		Roles         string `json:"roles"`
-		Iat           int64  `json:"iat"`
-		Exp           int64  `json:"exp"`
-		UserId        string `json:"user_id"`
-		IsAdmin       bool   `json:"isAdmin"`
-		IsPsy         bool   `json:"isPsy"`
-		Name          string `json:"name"`
-		Picture       string `json:"picture"`
-		Lang          string `json:"lang"`
-	}
-
-	EmailRoles struct {
-		Iat     int64
-		Email   string
-		Uid     string
-		Roles   []string
-		IsAdmin bool
-		IsPsy   bool
-		Name    string
-		Picture string
-		Lang    string
+		Keys []*Key `json:"keys"`
 	}
 )
 
@@ -63,6 +41,8 @@ var (
 	policy             *Policy
 	notAuthorizedError = errors.New("NotAuthorized")
 )
+
+//func (p *Policy)
 
 func SetPolicy(p *Policy) error {
 	if p == nil {
@@ -73,6 +53,10 @@ func SetPolicy(p *Policy) error {
 	}
 	policy = p
 	return nil
+}
+
+func (p *Policy) GetPolicy() *Policy {
+	return p
 }
 
 func getPubKeys() error {
@@ -95,8 +79,8 @@ func getPubKeys() error {
 		return err
 	}
 	pubKeys = nil
-	for _, jwk := range keys.Keys {
-		rsaPublicKey, err := getRsaPublicKey(jwk)
+	for _, key := range keys.Keys {
+		rsaPublicKey, err := getRsaPublicKey(key)
 		if err != nil {
 			return err
 		}
@@ -105,22 +89,22 @@ func getPubKeys() error {
 	return nil
 }
 
-func getRsaPublicKey(jwk map[string]string) (*rsa.PublicKey, error) {
-	if jwk["kty"] != "RSA" {
-		return nil, fmt.Errorf("invalid key type:", jwk["kty"])
+func getRsaPublicKey(jwk *Key) (*rsa.PublicKey, error) {
+	if jwk.Kty != "RSA" {
+		return nil, fmt.Errorf("invalid key type: %s", jwk.Kty)
 	}
-	nb, err := base64.RawURLEncoding.DecodeString(jwk["n"])
+	nb, err := base64.RawURLEncoding.DecodeString(jwk.N)
 	if err != nil {
 		return nil, err
 	}
 	e := 0
 	// The default exponent is usually 65537, so just compare the
 	// base64 for [1,0,1] or [0,1,0,1]
-	if jwk["e"] == "AQAB" || jwk["e"] == "AAEAAQ" {
+	if jwk.E == "AQAB" || jwk.E == "AAEAAQ" {
 		e = 65537
 	} else {
 		// need to decode "e" as a big-endian int
-		return nil, fmt.Errorf("need to deocde e:", jwk["e"])
+		return nil, fmt.Errorf("need to decode e: %s", jwk.E)
 	}
 	return &rsa.PublicKey{
 		N: new(big.Int).SetBytes(nb),
@@ -128,21 +112,7 @@ func getRsaPublicKey(jwk map[string]string) (*rsa.PublicKey, error) {
 	}, nil
 }
 
-func UnauthorizedCode(err error) int {
-	if err == notAuthorizedError {
-		return http.StatusUnauthorized
-	}
-	return http.StatusForbidden
-}
-
-func HasAuthorization(r *http.Request) bool {
-	return r.Header.Get(Authorization) != ""
-}
-
 func GetJwtFromHeader(r *http.Request) (*string, *string, *string, error) {
-	if !HasAuthorization(r) {
-		return nil, nil, nil, notAuthorizedError
-	}
 	bearer, err := header.GetHeaderRequired(r, Authorization)
 	if err != nil {
 		return nil, nil, nil, err
@@ -165,56 +135,7 @@ func GetJwtFromHeader(r *http.Request) (*string, *string, *string, error) {
 	return &token, &part1, &part2, nil
 }
 
-func IsJwtValid(r *http.Request, seconds ...int64) (*EmailRoles, int, error) {
-	token, part1, part2, err := GetJwtFromHeader(r)
-	if err != nil {
-		return nil, http.StatusUnauthorized, err
-	}
-	if err := verifyToken(token, part2); err != nil {
-		return nil, http.StatusConflict, err
-	}
-	bytes, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(*part1)
-	if err != nil {
-		return nil, http.StatusConflict, err
-	}
-	if policy == nil {
-		return nil, http.StatusConflict, errors.New("policy not defined")
-	}
-	now := time.Now().Unix()
-	payload := new(Payload)
-	if err := json.Unmarshal(bytes, payload); err != nil {
-		return nil, http.StatusConflict, err
-	}
-	if payload.Iss != policy.Issuer {
-		return nil, http.StatusConflict, errors.New("issuers not matched")
-	}
-	if payload.Aud != payload.Aud {
-		return nil, http.StatusConflict, errors.New("audience not matched")
-	}
-	validPeriod := SecondsInDay
-	if len(seconds) > 0 {
-		validPeriod = seconds[0]
-	}
-	if now > payload.Iat+validPeriod {
-		return nil, 419, errors.New("token has expired")
-	}
-	if !payload.EmailVerified {
-		return nil, http.StatusForbidden, fmt.Errorf("email of %s not verified", payload.Email)
-	}
-	return &EmailRoles{
-		Email:   payload.Email,
-		Uid:     payload.UserId,
-		Roles:   strings.Split(payload.Roles, ","),
-		IsAdmin: payload.IsAdmin,
-		IsPsy:   payload.IsPsy,
-		Iat:     payload.Iat,
-		Name:    payload.Name,
-		//Picture: payload.Picture,
-		Lang: payload.Lang,
-	}, http.StatusOK, nil
-}
-
-func verifyToken(token *string, part2 *string) error {
+func VerifyToken(token *string, part2 *string) error {
 	if pubKeys == nil {
 		if err := getPubKeys(); err != nil {
 			return err

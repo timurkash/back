@@ -3,7 +3,7 @@ package header
 import (
 	"errors"
 	"github.com/gorilla/mux"
-	"gitlab.com/mcsolutions/lib/back/common/consts"
+	"github.com/timurkash/back/consts"
 	"net/http"
 )
 
