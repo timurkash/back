@@ -26,6 +26,9 @@ func LoadEnvs(config interface{}) error {
 }
 
 func LoadEnvFileIfExists(envFile string) error {
+	if envFile == "" {
+		envFile = ".env"
+	}
 	if _, err := os.Stat(envFile); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return err
