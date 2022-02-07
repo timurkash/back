@@ -1,9 +1,11 @@
 package env
 
 import (
+	"errors"
 	"github.com/caarlos0/env"
 	"github.com/joho/godotenv"
 	"log"
+	"os"
 )
 
 type Env struct {
@@ -19,6 +21,19 @@ func LoadEnvs(config interface{}) error {
 	}
 	if err := env.Parse(config); err != nil {
 		return err
+	}
+	return nil
+}
+
+func LoadEnvFileIfExists(envFile string) error {
+	if _, err := os.Stat(envFile); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	} else {
+		if err := godotenv.Load(envFile); err != nil {
+			return err
+		}
 	}
 	return nil
 }
